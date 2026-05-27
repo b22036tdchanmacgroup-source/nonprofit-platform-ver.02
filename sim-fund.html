@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>설립·운영 자금 세무 시뮬레이터</title>
+<style>
+:root {
+  --bg:           #FDFAF1;
+  --bg-soft:      #F7F3E8;
+  --bg-elevated:  #FFFFFF;
+  --line:         #E5DCC7;
+  --line-soft:    #EFE7D3;
+  --ink:          #1B2538;
+  --ink-soft:     #4A5468;
+  --ink-mute:     #8A8676;
+  --accent:       #1B3A4B;
+  --accent-hi:    #2A5B73;
+  --gold:         #A47551;
+  --gold-soft:    #C9A576;
+  --done:         #4A7C59;
+  --accent-red:   #CF222E;
+  --shadow-sm:    0 1px 3px rgba(0,0,0,0.08);
+  --fs-xs:        12px;
+  --fs-sm:        14px;
+  --fs-base:      15px;
+  --fs-md:        16px;
+  --fs-lg:        18px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Pretendard', -apple-system, 'Noto Sans KR', sans-serif;
+  background: var(--bg-soft);
+  color: var(--ink);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  overflow-y: auto;
+  min-height: 100vh;
+}
+.sim-wrap { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+.btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid transparent; border-radius: 6px;
+  font-family: inherit; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; padding: 5px 12px; font-size: var(--fs-xs);
+}
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent-hi); }
+.btn-ghost { background: transparent; color: var(--ink); border-color: var(--line); }
+.btn-ghost:hover { background: var(--bg-elevated); }
+.input-f {
+  background: var(--bg-soft); border: 1px solid var(--line); border-radius: 5px;
+  color: var(--ink); font-family: monospace; font-size: var(--fs-xs);
+  text-align: right; padding: 4px 7px; outline: none; transition: all 0.2s;
+}
+.input-f:focus { border-color: var(--gold); background: #fff; }
+select {
+  background: var(--bg); border: 1px solid var(--line); border-radius: 4px;
+  color: var(--ink); font-size: var(--fs-xs); padding: 2px 4px; outline: none; cursor: pointer; height: 26px;
+}
+.plan-card {
+  position: relative; padding: 14px; border-radius: 10px;
+  background: var(--bg-elevated); border: 1px solid var(--line-soft);
+  box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 10px;
+}
+.sec-head {
+  font-size: var(--fs-base); font-weight: 700; color: var(--ink);
+  border-left: 3px solid var(--accent); padding-left: 8px; margin-bottom: 6px;
+}
+.sec-head-gold { font-size: var(--fs-base); font-weight: 700; color: var(--ink); border-left: 3px solid var(--gold); padding-left: 8px; margin-bottom: 6px; }
+.sec-head-red { font-size: var(--fs-base); font-weight: 700; color: var(--accent-red); border-left: 4px solid var(--accent-red); padding-left: 8px; margin-bottom: 6px; letter-spacing: -0.3px; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-soft); }
+::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="sim-wrap">
+
+  <!-- 상단 액션 바 -->
+  <div style="background:var(--bg-elevated);padding:12px 14px;border-radius:10px;border:1px solid var(--line-soft);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;">
+    <div style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;">
+      <span style="font-size:13px;font-weight:700;color:var(--gold);white-space:nowrap;">💾 저장 슬롯 :</span>
+      <button class="btn btn-ghost" id="sim-btn-sc1" onclick="loadFundScenario(1)">시나리오 1</button>
+      <button class="btn btn-ghost" id="sim-btn-sc2" onclick="loadFundScenario(2)">시나리오 2</button>
+      <button class="btn btn-ghost" id="sim-btn-sc3" onclick="loadFundScenario(3)">시나리오 3</button>
+      <div style="width:1px;height:14px;background:var(--line);margin:0 2px;"></div>
+      <select id="simSaveSlot"><option value="1">1번 슬롯</option><option value="2">2번 슬롯</option><option value="3">3번 슬롯</option></select>
+      <button class="btn btn-primary" onclick="saveFundScenario()" style="background:var(--done);border-color:var(--done);">현재 저장</button>
+      <button class="btn btn-ghost" onclick="clearFundSavedData()" style="border-color:var(--accent-red);color:var(--accent-red);">슬롯 삭제</button>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button class="btn btn-primary" onclick="addNewFundCompany()">+ 출연자(기업) 추가</button>
+      <button class="btn btn-ghost" onclick="resetFundAllInputs()" style="border-color:var(--accent-red);color:var(--accent-red);">입력 지우기</button>
+    </div>
+  </div>
+
+  <!-- ① 출연사별 세부 계획 -->
+  <div>
+    <div class="sec-head">① 출연사별 세부 계획</div>
+    <div id="fundCompanyContainer" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;"></div>
+  </div>
+
+  <!-- ② 재단 총 자산 요건 검증 -->
+  <div style="background:var(--bg-elevated);border-radius:10px;border:1px solid var(--line-soft);padding:14px;">
+    <div class="sec-head-gold">② 재단 총 자산 구성 및 요건 종합 검증</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px;">
+      <div style="background:var(--bg-soft);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:12px;color:var(--ink-soft);font-weight:600;margin-bottom:2px;">주식 자산가액</div>
+        <div style="font-size:var(--fs-md);font-weight:800;color:var(--gold);" id="fundResTotalStock">0원</div>
+      </div>
+      <div style="background:var(--bg-soft);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:12px;color:var(--ink-soft);font-weight:600;margin-bottom:2px;">현금 자산가액</div>
+        <div style="font-size:var(--fs-md);font-weight:800;color:var(--accent);" id="fundResTotalCash">0원</div>
+      </div>
+      <div style="background:var(--bg-soft);border:2px solid var(--gold);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:12px;color:var(--ink-soft);font-weight:700;margin-bottom:2px;">총 자산 합계</div>
+        <div style="font-size:var(--fs-md);font-weight:800;color:var(--ink);" id="fundResTotal">0원</div>
+      </div>
+      <div style="background:var(--bg-soft);border:1px solid var(--line);border-radius:8px;padding:10px;text-align:center;">
+        <div style="font-size:12px;color:var(--ink-soft);font-weight:600;margin-bottom:2px;">계열주식 / 총자산 비율</div>
+        <div style="font-size:var(--fs-md);font-weight:800;color:var(--accent-red);" id="fundResAffRatio">0.0%</div>
+        <div style="height:4px;background:var(--line-soft);border-radius:3px;overflow:hidden;margin-top:5px;">
+          <div id="fundBarAff" style="height:100%;width:0%;background:var(--accent);transition:width 0.3s;"></div>
+        </div>
+      </div>
+    </div>
+    <div style="overflow-x:auto;border:1px solid var(--line-soft);border-radius:7px;background:var(--bg-elevated);">
+      <table style="width:100%;border-collapse:collapse;text-align:left;font-size:13px;">
+        <thead>
+          <tr style="background:var(--bg-soft);border-bottom:1px solid var(--line-soft);">
+            <th style="padding:8px 10px;font-weight:700;">출연사</th>
+            <th style="padding:8px 10px;font-weight:700;">지분율</th>
+            <th style="padding:8px 10px;font-weight:700;">의결권한도(10%)</th>
+            <th style="padding:8px 10px;font-weight:700;">총자산비중(30%)</th>
+            <th style="padding:8px 10px;font-weight:700;">출연가액</th>
+            <th style="padding:8px 10px;font-weight:700;color:var(--accent-red);text-align:right;">예상 증여세</th>
+          </tr>
+        </thead>
+        <tbody id="fundAnalysisBody" style="color:var(--ink-soft);"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ③ 운영 안정성 + ④ 가산세 시뮬레이션 -->
+  <div style="display:flex;gap:14px;flex-wrap:wrap;">
+
+    <!-- 왼쪽: 운영 안정성 -->
+    <div style="background:var(--bg-elevated);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;flex:1;min-width:320px;border:1px solid var(--line-soft);">
+      <div class="sec-head">③ 운영 안정성 및 사후 의무</div>
+      <div style="background:var(--bg-soft);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:7px;border:1px solid var(--line-soft);">
+        <label style="font-size:13px;color:var(--ink-soft);font-weight:700;">1년 예상 운영·사업비 (원)</label>
+        <input type="text" class="input-f" id="fundAnnualBudget" value="0" oninput="handleFundInput(this)" style="width:100%;font-size:13px;">
+        <div id="fundCashStability" style="padding:8px;border-radius:6px;font-size:13px;font-weight:600;line-height:1.5;background:var(--bg-soft);border:1px solid var(--line-soft);"></div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--ink);margin-bottom:7px;">공익법인 사후 준수 의무 체크리스트</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="background:var(--bg-soft);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:7px;border:1px solid var(--line-soft);border-top:2px solid var(--gold);">
+            <div style="font-size:12px;font-weight:800;color:var(--gold);">제출 의무 (가산세 대상)</div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkDoc1" style="accent-color:var(--gold);"> 결산서류 공시</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkDoc2" style="accent-color:var(--gold);"> 출연재산 보고서</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkDoc3" style="accent-color:var(--gold);"> 외부 세무확인서</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkDoc4" style="accent-color:var(--gold);"> 주식보유 명세서</label>
+          </div>
+          <div style="background:var(--bg-soft);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:7px;border:1px solid var(--line-soft);border-top:2px solid var(--accent);">
+            <div style="font-size:12px;font-weight:800;color:var(--accent);">운영 준수 의무 (증여세 중과)</div>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkObl1" style="accent-color:var(--accent);"> 3년내 목적사업 사용</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkObl2" style="accent-color:var(--accent);"> 운용소득 80% 이상 사용</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkObl3" style="accent-color:var(--accent);"> 이사 특수관계인 제한</label>
+            <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--ink-soft);cursor:pointer;"><input type="checkbox" id="chkObl4" style="accent-color:var(--accent);"> 공익전용계좌 사용</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 가산세 시뮬레이션 -->
+    <div style="background:var(--bg-elevated);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:12px;flex:1;min-width:320px;border:1px solid var(--line-soft);">
+      <div class="sec-head-red">④ 가산세 및 증여세 누계 시뮬레이션</div>
+      <div style="background:linear-gradient(135deg,#1B2538 0%,#2A3B5C 100%);border-radius:10px;padding:14px;text-align:center;">
+        <div style="font-size:12px;color:var(--gold);font-weight:800;letter-spacing:1px;margin-bottom:4px;">사후관리 총 예상 세액 및 가산세 합계</div>
+        <div style="font-size:22px;font-weight:800;color:#fff;" id="fundResTotalTax">0원</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px;">
+
+        <div style="background:var(--bg-soft);border-radius:7px;padding:10px;border:1px solid var(--line-soft);">
+          <div style="font-size:13px;font-weight:700;margin-bottom:5px;">출연재산 3년 내 미사용액 (원)</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;">
+            <input type="text" class="input-f" id="fundUnusedGift" value="0" oninput="handleFundInput(this)" style="flex:1;">
+            <div style="font-size:13px;font-weight:800;color:var(--accent-red);min-width:80px;text-align:right;" id="fundResGift1">0원</div>
+          </div>
+        </div>
+
+        <div style="background:var(--bg-soft);border-radius:7px;padding:10px;border:1px solid var(--line-soft);">
+          <div style="font-size:13px;font-weight:700;margin-bottom:7px;">매각대금 목적 외 사용 의무 (3년 이내)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">매각대금 총액</label><input type="text" class="input-f" id="fundSaleTotal" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">1·2년차 미달액</label><input type="text" class="input-f" id="fundSaleShortStep" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">3년차 최종미달</label><input type="text" class="input-f" id="fundSaleShortFinal" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--accent-red);font-weight:700;margin-top:6px;padding-top:5px;border-top:1px dashed var(--line-soft);">
+            <span>1·2년차 가산세: <span id="fundResPenalty2">0원</span></span>
+            <span>3년차 증여세: <span id="fundResGift2">0원</span></span>
+          </div>
+        </div>
+
+        <div style="background:var(--bg-soft);border-radius:7px;padding:10px;border:1px solid var(--line-soft);">
+          <div style="font-size:13px;font-weight:700;margin-bottom:7px;">이자·배당 운용소득 의무 사용 (연 80%)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">운용소득 총액</label><input type="text" class="input-f" id="fundOpIncome" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">목적외 사용액</label><input type="text" class="input-f" id="fundOpNonPublic" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">80% 사용 미달</label><input type="text" class="input-f" id="fundOpShort80" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--accent-red);font-weight:700;margin-top:6px;padding-top:5px;border-top:1px dashed var(--line-soft);">
+            <span>목적외 증여세: <span id="fundResGift3">0원</span></span>
+            <span>80% 미달 가산세: <span id="fundResPenalty3">0원</span></span>
+          </div>
+        </div>
+
+        <div style="background:var(--bg-soft);border-radius:7px;padding:10px;border:1px solid var(--line-soft);">
+          <div style="font-size:13px;font-weight:700;margin-bottom:7px;">출연재산 일정비율 의무사용 (5%초과 시 200% 중과)</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">1% 기준 미달액 (5%초과)</label><input type="text" class="input-f" id="fundVAssetShort1" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+            <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;">3% 기준 미달액 (10%초과)</label><input type="text" class="input-f" id="fundVAssetShort3" value="0" oninput="handleFundInput(this)" style="width:100%;margin-top:3px;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--accent-red);font-weight:700;margin-top:6px;padding-top:5px;border-top:1px dashed var(--line-soft);">
+            <span>1% 미달세액: <span id="fundResPenalty4_1">0원</span></span>
+            <span>3% 미달세액: <span id="fundResPenalty4_3">0원</span></span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let fundCompIdCounter = 0;
+
+function calcGiftTax(base) {
+  if (base <= 0) return 0;
+  if (base <= 1e8) return base * 0.1;
+  if (base <= 5e8) return base * 0.2 - 1e7;
+  if (base <= 1e9) return base * 0.3 - 6e7;
+  if (base <= 3e9) return base * 0.4 - 1.6e8;
+  return base * 0.5 - 4.6e8;
+}
+function fNum(n) {
+  if (!n && n !== 0) return "0";
+  return Math.round(n).toString().replace(/\D/g,"").replace(/\B(?=(\d{3})+(?!\d))/g,",");
+}
+function pNum(s) {
+  if (!s) return 0;
+  return parseFloat(s.toString().replace(/,/g,"")) || 0;
+}
+function get(id) { return document.getElementById(id); }
+
+window.handleFundInput = function(el) {
+  let str = el.value.replace(/\D/g,"");
+  el.value = str.replace(/\B(?=(\d{3})+(?!\d))/g,",");
+  updateFundSim();
+};
+
+window.addNewFundCompany = function(initialData = {}) {
+  fundCompIdCounter++;
+  const id = fundCompIdCounter;
+  const cardId = `fundCompCard_${id}`;
+  const container = get('fundCompanyContainer');
+  if (!container) return;
+  const name = initialData.name || `출연기업 ${id}`;
+  const isAff = initialData.isAff !== false;
+  const ts = initialData.ts || '0';
+  const cs = initialData.cs || '0';
+  const pr = initialData.pr || '0';
+  const cash = initialData.cash || '0';
+  container.insertAdjacentHTML('beforeend', `
+    <div class="plan-card" id="${cardId}">
+      <button onclick="deleteFundCompany('${cardId}')" style="position:absolute;right:8px;top:8px;background:none;border:none;font-size:14px;color:var(--ink-mute);cursor:pointer;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:50%;transition:all 0.2s;" onmouseover="this.style.background='rgba(207,34,46,0.1)';this.style.color='var(--accent-red)'" onmouseout="this.style.background='none';this.style.color='var(--ink-mute)'">✕</button>
+      <div style="display:flex;align-items:center;gap:7px;border-bottom:1px solid var(--line-soft);padding-bottom:7px;">
+        <input type="text" class="fund-comp-name" value="${name}" oninput="updateFundSim()" style="background:transparent;border:none;border-bottom:1px solid transparent;color:var(--ink);font-weight:700;font-size:var(--fs-sm);outline:none;flex:1;transition:border 0.2s;" onfocus="this.style.borderBottomColor='var(--gold)'" onblur="this.style.borderBottomColor='transparent'">
+        <label style="color:var(--gold);cursor:pointer;font-size:13px;display:flex;align-items:center;gap:3px;user-select:none;font-weight:600;white-space:nowrap;"><input type="checkbox" class="fund-comp-aff" ${isAff?'checked':''} onchange="updateFundSim()"> 계열사</label>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+        <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:3px;">발행주식총수</label><input type="text" class="fund-comp-ts" value="${ts}" oninput="handleFundInput(this)" style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--ink);padding:3px 6px;border-radius:4px;font-size:12px;text-align:right;font-family:monospace;font-weight:700;outline:none;"><span class="fund-comp-guide" style="font-size:8px;color:var(--ink-mute);display:block;margin-top:2px;">5%: 0 | 10%: 0</span></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:3px;">출연 주식 수</label><input type="text" class="fund-comp-cs" value="${cs}" oninput="handleFundInput(this)" style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--ink);padding:3px 6px;border-radius:4px;font-size:12px;text-align:right;font-family:monospace;font-weight:700;outline:none;"><span style="font-size:8px;color:var(--ink-soft);display:block;margin-top:2px;">출연율: <span class="fund-comp-ratio" style="color:var(--accent);">0.00%</span></span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;">
+        <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:3px;">주당 평가액(원)</label><input type="text" class="fund-comp-pr" value="${pr}" oninput="handleFundInput(this)" style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--ink);padding:3px 6px;border-radius:4px;font-size:12px;text-align:right;font-family:monospace;font-weight:700;outline:none;"></div>
+        <div><label style="font-size:12px;color:var(--ink-soft);font-weight:600;display:block;margin-bottom:3px;">현금 출연액(원)</label><input type="text" class="fund-comp-cash" value="${cash}" oninput="handleFundInput(this)" style="width:100%;background:var(--bg-soft);border:1px solid var(--line);color:var(--ink);padding:3px 6px;border-radius:4px;font-size:12px;text-align:right;font-family:monospace;font-weight:700;outline:none;"></div>
+      </div>
+      <div class="fund-comp-subtotal" style="background:var(--bg-soft);padding:7px;border-radius:6px;border:1px solid var(--line-soft);font-size:12px;display:flex;flex-direction:column;gap:3px;"></div>
+    </div>`);
+  updateFundSim();
+};
+
+window.deleteFundCompany = function(cardId) {
+  const cards = document.querySelectorAll('.plan-card[id^="fundCompCard_"]');
+  if (cards.length <= 1) { alert("최소 한 명의 출연자 기획은 존재해야 합니다."); return; }
+  const el = get(cardId);
+  if (el) { el.remove(); updateFundSim(); }
+};
+
+window.updateFundSim = function() {
+  const cards = document.querySelectorAll('.plan-card[id^="fundCompCard_"]');
+  let totalStockVal=0, totalCashVal=0, affStockVal=0, totalExcessGiftTax=0;
+  let over5=false, over10=false;
+  let tableHtml="";
+
+  cards.forEach(card => {
+    const name = card.querySelector('.fund-comp-name').value;
+    const ts = pNum(card.querySelector('.fund-comp-ts').value);
+    const cs = pNum(card.querySelector('.fund-comp-cs').value);
+    const pr = pNum(card.querySelector('.fund-comp-pr').value);
+    const cash = pNum(card.querySelector('.fund-comp-cash').value);
+    const isAff = card.querySelector('.fund-comp-aff').checked;
+    const ratio = ts > 0 ? (cs/ts)*100 : 0;
+    if (ratio > 5) over5 = true;
+    if (ratio > 10) over10 = true;
+    const stockVal = cs * pr;
+    totalStockVal += stockVal; totalCashVal += cash;
+    if (isAff) affStockVal += stockVal;
+    card.querySelector('.fund-comp-guide').innerText = `5%: ${fNum(Math.floor(ts*0.05))} | 10%: ${fNum(Math.floor(ts*0.1))}`;
+    card.querySelector('.fund-comp-ratio').innerText = ratio.toFixed(2)+"%";
+    card.querySelector('.fund-comp-subtotal').innerHTML = `
+      <div style="display:flex;justify-content:space-between;"><span>주식 출연액:</span><span style="font-weight:700;color:var(--ink);">${fNum(stockVal)}원</span></div>
+      <div style="display:flex;justify-content:space-between;"><span>현금 출연액:</span><span style="font-weight:700;color:var(--ink-soft);">+ ${fNum(cash)}원</span></div>
+      <div style="display:flex;justify-content:space-between;border-top:1px dashed var(--line);padding-top:3px;font-weight:800;"><span>합계:</span><span style="color:var(--accent);">= ${fNum(stockVal+cash)}원</span></div>`;
+    const excess = ratio > 10 ? (cs-(ts*0.1))*pr : 0;
+    totalExcessGiftTax += calcGiftTax(excess);
+    tableHtml += `<tr style="border-bottom:1px solid var(--line-soft);">
+      <td style="padding:8px 10px;font-weight:600;">${name}</td>
+      <td style="padding:8px 10px;font-family:monospace;">${ratio.toFixed(2)}%</td>
+      <td style="padding:8px 10px;"><span style="padding:2px 6px;border-radius:3px;font-size:12px;font-weight:700;${ratio<=10?'background:rgba(74,124,89,0.1);color:var(--done);':'background:rgba(207,34,46,0.1);color:var(--accent-red);'}">${ratio<=10?'적합':'초과'}</span></td>
+      <td style="padding:8px 10px;"><span id="assetBadge_${card.id}">-</span></td>
+      <td style="padding:8px 10px;font-family:monospace;">${fNum(stockVal)}원</td>
+      <td style="padding:8px 10px;text-align:right;font-family:monospace;color:var(--accent-red);font-weight:700;">${fNum(calcGiftTax(excess))}원</td>
+    </tr>`;
+  });
+
+  const totalAsset = totalStockVal + totalCashVal;
+  const affRatio = totalAsset > 0 ? (affStockVal/totalAsset)*100 : 0;
+
+  const upd = (id, v) => { const el=get(id); if(el) el.innerText=v; };
+  upd('fundResTotalStock', fNum(totalStockVal)+"원");
+  upd('fundResTotalCash', fNum(totalCashVal)+"원");
+  upd('fundResTotal', fNum(totalAsset)+"원");
+  upd('fundResAffRatio', affRatio.toFixed(2)+"%");
+  const bar = get('fundBarAff');
+  if (bar) { bar.style.width=Math.min(affRatio,100)+"%"; bar.style.backgroundColor=affRatio>50?"var(--accent-red)":"var(--accent)"; }
+  const tbody = get('fundAnalysisBody');
+  if (tbody) tbody.innerHTML = tableHtml;
+
+  cards.forEach(card => {
+    const sv = pNum(card.querySelector('.fund-comp-cs').value) * pNum(card.querySelector('.fund-comp-pr').value);
+    const sr = totalAsset > 0 ? (sv/totalAsset)*100 : 0;
+    const b = get(`assetBadge_${card.id}`);
+    if (b) { b.innerText=sr.toFixed(1)+"%"; Object.assign(b.style,{display:"inline-block",padding:"2px 6px",borderRadius:"3px",fontSize:"9px",fontWeight:"700",background:sr<=30?"rgba(74,124,89,0.1)":"rgba(207,34,46,0.1)",color:sr<=30?"var(--done)":"var(--accent-red)"}); }
+  });
+
+  const i3p = get('fundVAssetShort3');
+  if (i3p) { i3p.disabled = !over10; if (!over10) i3p.value="0"; }
+
+  const budget = pNum(get('fundAnnualBudget')?.value);
+  const req3 = budget * 3;
+  const isStable = totalCashVal >= req3 && totalCashVal > 0;
+  const sBox = get('fundCashStability');
+  if (sBox) {
+    sBox.style.background = isStable ? "rgba(74,124,89,0.05)" : (totalCashVal > 0 ? "rgba(207,34,46,0.05)" : "var(--bg-soft)");
+    sBox.style.border = isStable ? "1px solid rgba(74,124,89,0.15)" : (totalCashVal > 0 ? "1px solid rgba(207,34,46,0.15)" : "1px solid var(--line-soft)");
+    sBox.innerHTML = `<div>출연현금: <strong style="color:var(--accent);">${fNum(totalCashVal)}원</strong> / 3개년 안정 예산: <strong>${fNum(req3)}원</strong></div>
+      <div style="margin-top:4px;font-weight:700;color:${isStable?'var(--done)':(totalCashVal>0?'var(--accent-red)':'var(--ink-mute)')}">${totalCashVal===0?"⚠️ 보통재산(현금) 출연을 계획하십시오.":(isStable?"✓ 운영 안정성 검사 적합":"⚠ 현금 출연 비중 상향 필요")}</div>`;
+  }
+
+  const vG1 = calcGiftTax(pNum(get('fundUnusedGift')?.value));
+  upd('fundResGift1', fNum(vG1)+"원");
+  const vP2 = pNum(get('fundSaleShortStep')?.value) * 0.1;
+  upd('fundResPenalty2', fNum(vP2)+"원");
+  const vG2 = calcGiftTax(pNum(get('fundSaleShortFinal')?.value));
+  upd('fundResGift2', fNum(vG2)+"원");
+  const opI = pNum(get('fundOpIncome')?.value);
+  const opNp = pNum(get('fundOpNonPublic')?.value);
+  const vG3 = opI > 0 ? calcGiftTax(totalStockVal * (opNp/opI)) : 0;
+  upd('fundResGift3', fNum(vG3)+"원");
+  const vP3 = pNum(get('fundOpShort80')?.value) * 0.1;
+  upd('fundResPenalty3', fNum(vP3)+"원");
+  const vP4_1 = pNum(get('fundVAssetShort1')?.value) * (over5 ? 2.0 : 0.1);
+  const el41 = get('fundResPenalty4_1');
+  if (el41) { el41.innerText=(over5?"[200% 중과] ":"[10% 가산] ")+fNum(vP4_1)+"원"; el41.style.color=over5?"var(--accent-red)":"var(--ink-soft)"; }
+  const vP4_3 = pNum(get('fundVAssetShort3')?.value) * (over5 ? 2.0 : 0.1);
+  const el43 = get('fundResPenalty4_3');
+  if (el43) { el43.innerText=(over5?"[200% 중과] ":"[10% 가산] ")+fNum(vP4_3)+"원"; el43.style.color=over5?"var(--accent-red)":"var(--ink-soft)"; }
+
+  const total = totalExcessGiftTax + vG1 + vP2 + vG2 + vG3 + vP3 + vP4_1 + vP4_3;
+  upd('fundResTotalTax', fNum(total)+"원");
+};
+
+window.saveFundScenario = function() {
+  const slot = get('simSaveSlot').value;
+  const cards = document.querySelectorAll('.plan-card[id^="fundCompCard_"]');
+  const data = {
+    companies: Array.from(cards).map(c => ({ name:c.querySelector('.fund-comp-name').value, ts:c.querySelector('.fund-comp-ts').value, cs:c.querySelector('.fund-comp-cs').value, pr:c.querySelector('.fund-comp-pr').value, cash:c.querySelector('.fund-comp-cash').value, isAff:c.querySelector('.fund-comp-aff').checked })),
+    others: Object.fromEntries(['fundAnnualBudget','fundUnusedGift','fundSaleTotal','fundSaleShortStep','fundSaleShortFinal','fundOpIncome','fundOpNonPublic','fundOpShort80','fundVAssetShort1','fundVAssetShort3'].map(k => [k, get(k)?.value||'0'])),
+    checks: ['chkDoc1','chkDoc2','chkDoc3','chkDoc4','chkObl1','chkObl2','chkObl3','chkObl4'].map(id => ({id, checked: get(id)?.checked||false}))
+  };
+  localStorage.setItem('tf_fund_sim_'+slot, JSON.stringify(data));
+  alert(`시뮬레이션 [시나리오 ${slot}번] 저장되었습니다.`);
+  updateFundScenarioButtons();
+};
+
+window.loadFundScenario = function(slot) {
+  const saved = localStorage.getItem('tf_fund_sim_'+slot);
+  if (!saved) { alert(`시나리오 ${slot}번 슬롯에 저장된 데이터가 없습니다.`); return; }
+  const data = JSON.parse(saved);
+  const container = get('fundCompanyContainer');
+  if (!container) return;
+  container.innerHTML = ''; fundCompIdCounter = 0;
+  data.companies.forEach(c => addNewFundCompany(c));
+  for (let key in data.others) { const el=get(key); if(el) el.value=data.others[key]; }
+  data.checks.forEach(c => { const el=get(c.id); if(el) el.checked=c.checked; });
+  alert(`[시나리오 ${slot}번] 데이터를 불러왔습니다.`);
+  updateFundSim();
+};
+
+window.updateFundScenarioButtons = function() {
+  for (let i=1; i<=3; i++) {
+    const btn = get('sim-btn-sc'+i);
+    if (!btn) continue;
+    const saved = localStorage.getItem('tf_fund_sim_'+i);
+    if (saved) { btn.style.color='#fff'; btn.style.background='var(--gold)'; btn.style.borderColor='var(--gold)'; btn.innerText=`시나리오 ${i} 💾`; }
+    else { btn.style.color=''; btn.style.background=''; btn.style.borderColor=''; btn.innerText=`시나리오 ${i}`; }
+  }
+};
+
+window.clearFundSavedData = function() {
+  if (confirm('모든 자금 시뮬레이션 저장 슬롯을 삭제하시겠습니까?')) {
+    for (let i=1; i<=3; i++) localStorage.removeItem('tf_fund_sim_'+i);
+    location.reload();
+  }
+};
+
+window.resetFundAllInputs = function() {
+  if (confirm('모든 시뮬레이션 입력을 초기화하시겠습니까?')) {
+    const container = get('fundCompanyContainer');
+    if (container) container.innerHTML = '';
+    fundCompIdCounter = 0; addNewFundCompany();
+    ['fundAnnualBudget','fundUnusedGift','fundSaleTotal','fundSaleShortStep','fundSaleShortFinal','fundOpIncome','fundOpNonPublic','fundOpShort80','fundVAssetShort1','fundVAssetShort3'].forEach(id => { const el=get(id); if(el) el.value="0"; });
+    ['chkDoc1','chkDoc2','chkDoc3','chkDoc4','chkObl1','chkObl2','chkObl3','chkObl4'].forEach(id => { const el=get(id); if(el) el.checked=false; });
+    updateFundSim();
+  }
+};
+
+// Auto-init
+(function() { addNewFundCompany(); updateFundScenarioButtons(); })();
+</script>
+</body>
+</html>
